@@ -201,8 +201,10 @@ def risk_summary(log_returns):
     :return: dict 
     """
     # assume business day returns unless freq set
-    freq = log_returns.index.freq.name
-    if freq is None: freq = 'B'
+    if hasattr(log_returns.index, 'freq'):
+        freq = log_returns.index.freq.name
+    else:
+        freq = 'B'
 
     # min return for Sharpe, etc.
     min_ret = 0
@@ -216,10 +218,10 @@ def risk_summary(log_returns):
     out['Sharpe 2%'] = annual_sharpe(log_returns, freq=freq, min_ann_ret=0.02)
     out['Sortino 2%'] = annual_sortino(log_returns, freq=freq, min_ann_ret=0.02)
 
-    (mdd_pct, mdd_date, mdd_sdate, mdd_edate) = max_drawdown(log_returns)
-    out['MDD %'] = np.expm1(mdd_pct)
-    out['MDD Date'] = mdd_date.date()
-    out['MDD SDate'] = mdd_sdate.date()
-    out['MDD EDate'] = mdd_edate.date()
+    # (mdd_pct, mdd_date, mdd_sdate, mdd_edate) = max_drawdown(log_returns)
+    # out['MDD %'] = np.expm1(mdd_pct)
+    # out['MDD Date'] = mdd_date.date()
+    # out['MDD SDate'] = mdd_sdate.date()
+    # out['MDD EDate'] = mdd_edate.date()
 
     return out
