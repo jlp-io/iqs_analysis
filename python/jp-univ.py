@@ -15,7 +15,7 @@ univ_jp = [
     900035, # CBOT Corn (Gen  1)
 ]
 
-hdf5_fn = 'jp_univ.h5'
+hdf5_fn = 'jp-univ.h5'
 
 # start and end dates
 hist_sdate = date(2015, 1, 4)
@@ -31,7 +31,7 @@ pd.set_option('io.hdf.default_format', 'table')
 hdf = pd.HDFStore(hdf5_fn, complib='zlib', complevel=6)
 hdf.put('fser', fser)
 for fut in data.keys():
-    for freq in '1m,15m,dly'.split(','):
+    for freq in '15m,dly'.split(','):
         hdf.put(f"f{fut}_{freq}", data[fut][freq])
 hdf.close()
 
@@ -47,9 +47,9 @@ fser = hdf.get('fser')
 data = {}
 for fut in fser.index:
     data[fut] = {}
-    for freq in '1m,15m,dly'.split(','):
+    for freq in '15m,dly'.split(','):
         data[fut][freq] = hdf.get(f"f{fut}_{freq}")
 hdf.close()
 
-# drop useless columns fro descriptive df
+# drop useless columns from descriptive df
 fser.drop('is_gbx,ric,bbid,frst_tdate,last_tdate,fser,fmth,undl,isin,icb'.split(','), axis=1)
