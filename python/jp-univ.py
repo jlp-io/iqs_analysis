@@ -28,7 +28,7 @@ tgt_vol_ann = 0.01 * np.sqrt(252)  # 0.25  # annualised target volatility ~ 1% p
 fser, data = u.load_univ_data(univ_jp, hist_sdate, bar_sdate, hist_edate, tgt_vol_ann)
 
 pd.set_option('io.hdf.default_format', 'table')
-hdf = pd.HDFStore(hdf5_fn, complib='zlib', complevel=6)
+hdf = pd.HDFStore(hdf5_fn, complib='zlib', complevel=6, mode='w')
 hdf.put('fser', fser)
 for fut in data.keys():
     for freq in '15m,dly'.split(','):
@@ -42,7 +42,7 @@ import pandas as pd
 
 hdf5_fn = 'jp_univ.h5'
 
-hdf = pd.HDFStore(hdf5_fn, complib='zlib', complevel=6)
+hdf = pd.HDFStore(hdf5_fn, , mode='r')
 fser = hdf.get('fser')
 data = {}
 for fut in fser.index:
