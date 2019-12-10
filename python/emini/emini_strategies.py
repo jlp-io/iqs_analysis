@@ -223,8 +223,8 @@ class RiseFallVolume(RiseFall):
         tqty = tqty.loc[tqty['trdQty-09:45'] > 500]
 
         # series can be slightly different due to holidays and nan's being dropped, align them
-        tqty = tqty[tqty.index.intersection(flag.index)]
-        flag = flag[tqty.index]
+        tqty = tqty.loc[tqty.index.intersection(flag.index)]
+        flag = flag.loc[tqty.index]
         
         # rolling 10 day (using 9 to more or less match original implementaion)
         tqty['trdQty-09:45-10day'] = tqty['trdQty-09:45'].rolling(9).max()
@@ -242,6 +242,43 @@ class Overnight(RiseFall):
         # simply go long every day, has to be a pd.Series
         flag = daily_snapshots(bars, self.prcType, self.hmCur, 'America/New_York') > 0
         return pd.Series(index=flag.index, data = 1.0)
+
+
+class NewRule1(RiseFall):
+    def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, hmCur: str, hmPre: str = None, hmHiLo=None, qtyDays=None):
+        super().__init__(name, instr, prcType, stopper, hmUnw, hmCur=hmCur, hmPre=hmPre, hmHiLo=hmHiLo)
+        self.qtyDays = qtyDays
+        
+    @property
+    def descr(self):
+        descr = super().descr
+        if self.qtyDays is not None:
+            descr['qtyDays'] = self.qtyDays
+        return descr
+        
+    def signals(self, bars):
+        # signals from prices
+        flag = super().signals(bars)
+
+        if self.qtyDays is None:
+            return flag
+        
+        # trade volume
+        tqty = daily_snapshots(bars, 'trdQty', ['09:45'], 'America/New_York')
+
+        # remove holidays
+        tqty = tqty.loc[tqty['trdQty-09:45'] > 500]
+
+        # series can be slightly different due to holidays and nan's being dropped, align them
+        tqty = tqty.loc[tqty.index.intersection(flag.index)]
+        flag = flag.loc[tqty.index]
+
+        # rolling 10 day (using 9 to more or less match original implementaion)
+        tqty['trdQty-09:45-10day'] = tqty['trdQty-09:45'].rolling(self.qtyDays).max()
+
+        flag.loc[tqty['trdQty-09:45'] < tqty['trdQty-09:45-10day']] = 0
+        flag.loc[np.isnan(tqty['trdQty-09:45-10day'])] = 0
+        return flag
 
 
 # 2. If the difference between the opening and high prices for the period from 9.45am to 10am hits a 30-day low and
