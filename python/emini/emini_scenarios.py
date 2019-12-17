@@ -13,7 +13,6 @@ def run_scenario(data, strategies):
     trds = trds.set_index(['tdate', 'strat'])
     return trds
 
-
 def run_scenarios(data, scenarios):
 
     # list of all strats in all scenarios
@@ -34,6 +33,7 @@ def run_scenarios(data, scenarios):
 
     for scen_name, strats in scenarios.items():
         print(f'running {scen_name}')
+        #ValueError: can not merge DataFrame with instance of type <class 'pandas.core.series.Series'>
         trds[scen_name] = run_scenario(data, strats)
 
         # scenario level outputs

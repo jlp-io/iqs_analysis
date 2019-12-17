@@ -7,7 +7,11 @@ import pandas as pd
 def daily_snap(in_df: pd.DataFrame, out_df: pd.DataFrame, in_col: str, out_col: str, offset, tz):
     # We use an asof merge here as it allows for a tolerance, not possible with the .asof() function.
     idx_df = pd.DataFrame(index=(out_df.index + offset).tz_localize(tz))
-    snap = pd.merge_asof(idx_df, in_df[in_col],
+    #ValueError: can not merge DataFrame with instance of type <class 'pandas.core.series.Series'>
+    #This is the end of the stack trace
+    #idx_df is a dataframe, in_df[in_col] is a series
+    in_df2 = pd.DataFrame(in_df[in_col])        #my line 
+    snap = pd.merge_asof(idx_df, in_df2,
                   left_index=True, right_index=True, direction='backward',
                   tolerance=pd.offsets.Timedelta('03:30:00'))
     snap.index = snap.index.date 
@@ -46,6 +50,7 @@ def rise_or_fall(prices : list):
 def rise_or_fall_df(snap : pd.DataFrame, cols):
     signs = pd.Series(index=snap.index, data=0, dtype=np.int32)
     for i in range(len(cols)-1):
+        #RuntimeWarning: invalid value encountered in sign
         signs += np.sign(snap[cols[i+1]] - snap[cols[i]])
     signs.loc[np.abs(signs) < len(cols)-1] = 0
     signs /= (len(cols)-1)
@@ -169,7 +174,8 @@ class RiseFall:
 
         # this is the underlying price for stop loss purposes, not the adjusted price used by the strat  
         #sig_idx = (signal.index + pd.offsets.Timedelta(hm_t + ':00')).tz_localize('America/New_York')
-        out['sigPrc'] = bars[self.prcType].asof(sig_indx).values
+        bars[self.prcType].asof(sig_indx)
+        #out['sigPrc'] = bars[self.prcType].asof(sig_indx).values
 
         # just set the trade prices according to the overrides...
         out['inTS'] = trd_indx
@@ -312,6 +318,53 @@ class NewRule2(RiseFall):
         flag[zero] = 0
         return flag
 
+# 3. Measure the price range for all 15, 30, 45 and 60-minute periods from 9am to 12pm.  If the range hits a 30-day
+#    low and the volume is equal to or greater than the mean for this period, then go short if the price falls by 70%
+#    of the range and long if the price rises by 70% of the range.
+
+#    array of integers from start to finish, ordered by value and then subtract highest from lowest 
+#    ranges[i] < 30_day_low_of_ranges
+#        ranges[i][vol] >= ranges[i].mean()
+#            short
+
+class NewRule3(RiseFall):
+    def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, 
+                hmPre='09:30,16:00', hmCur: str='09:45,10:00'):
+        super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
+
+    def signals(self, bars):
+        #30_day_low_of_ranges = None
+        #length of hmPre array causes a KeyError
+        ranges_15 = ['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00']
+        ranges_30 = ['9:00','9:30','10:00','10:30','11:00','11:30','12:00']
+        ranges_45 = ['9:00','9:45','10:30','11:15','12:00']
+        ranges_60 = ['9:00','10:00','11:00','12:00']
+        # signals from prices
+        flag = super().signals(bars)
+        # grab prev day at 09:00 to 12:00, in 15 min increments
+        day1 = daily_snapshots(bars, 'opnPrc,higPrc,lowPrc,clsPrc,trdQty'.split(','), ranges_15, 'America/New_York')
+
+        ranges = dict()
+        ranges_df = day1.copy()
+
+        #create range values for everything
+        for j in range(0, len(ranges_15)):
+            ranges_df['range-'+ranges_15[j]] = None
+            for i in range(0, len(day1)):
+                ranges_df['range-'+ranges_15[j]][i] = (ranges_df['higPrc-'+ranges_15[j]][i] - day1['lowPrc-'+ranges_15[j]][i])
+                ranges.update({str(day1.index[i]) + ' ' + ranges_15[j]: (day1['higPrc-'+ranges_15[j]][i] - day1['lowPrc-'+ranges_15[j]][i])})
+
+        ranges_df.to_clipboard()
+
+        #comparing range values
+        for j in range(0, len(ranges_15)):
+            if j+1 < len(ranges_15): 
+                for i in range(0, len(day1)):      
+                    price_range = abs(ranges_df['clsPrc-'+ranges_15[j+1]][i] - ranges_df['opnPrc-'+ranges_15[j+1]][i])
+                    if price_range >= (ranges_df['range-'+ranges_15[j]][i] * 0.7):
+                        print(i, price_range, (ranges_df['range-'+ranges_15[j]][i] * 0.7))
+
+        return flag
 
 # 4. If the price falls from 9.30am to 4pm by more than it has in any of the previous 90 days, go long the following
 #    day at 9.45am if (i) the price rises from 4pm to 9.30am, and (ii) the price rises from 9.30am to 9.45am.
@@ -342,8 +395,10 @@ class NewRule4(RiseFall):
         # remove where condition not met
         zero = (day1['diff'] > day1['diff-90'])
         flag[zero] = 0
-        return flag
 
+        print(flag)
+        flag.to_clipboard()
+        return flag
 
 # 5. If the price hits a 30-day high between 9.30am and 4pm, go long the following day at 9.45am if (i) the price 
 #    rises from 4pm to 9.30am, and (ii) the price rises from 9.30am to 9.45am.
@@ -379,6 +434,19 @@ class NewRule5(RiseFall):
         flag[zero] = 0
         return flag
 
+class NewRule6(RiseFall):
+    def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, 
+                 hmPre='16:00', hmCur: str='09:30,09:45'):
+        super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
+
+    #def signals(self, bars):
+
+class NewRule7(RiseFall):
+    def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, 
+                 hmPre='16:00', hmCur: str='09:30,09:45'):
+        super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
+
+    #def signals(self, bars):
 
 
 # 8. If the e-mini rises (or falls) between 4pm and 9.30am by more than it has on any of the previous 30 days, 

@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd
 
 from os.path import basename
-from deprecated import deprecated
-
+#from deprecated import deprecated
 import bokeh.io
 from bokeh.layouts import (
     column, row, gridplot, layout
