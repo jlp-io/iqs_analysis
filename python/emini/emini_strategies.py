@@ -343,30 +343,37 @@ class NewRule3(RiseFall):
         # grab prev day at 09:00 to 12:00, in 15 min increments
         day1 = daily_snapshots(bars, 'opnPrc,higPrc,lowPrc,clsPrc,trdQty'.split(','), ranges_15, 'America/New_York')
 
-        ranges = dict()
         ranges_df = day1.copy()
+        long_orders = list()
+        short_orders = list()
 
         #create range values for everything
+        #need to reverse loop structure 
         for j in range(0, len(ranges_15)):
             ranges_df['range-'+ranges_15[j]] = None
             for i in range(0, len(day1)):
                 ranges_df['range-'+ranges_15[j]][i] = (ranges_df['higPrc-'+ranges_15[j]][i] - day1['lowPrc-'+ranges_15[j]][i])
-                ranges.update({str(day1.index[i]) + ' ' + ranges_15[j]: (day1['higPrc-'+ranges_15[j]][i] - day1['lowPrc-'+ranges_15[j]][i])})
                 #30 day low calculation
-                if i >= 30:
-                    ranges_df_loc = ranges_df['range-'+ranges_15[j]][i-30:i]
-                    if ranges_df['range-'+ranges_15[j]][i] <= ranges_df_loc.min(): 
-                        print("new thirty day low", ranges_df.index[i], ranges_df['range-'+ranges_15[j]][i], ranges_df_loc.min()) 
+                if i >= 30 & j-1 >= 0:
+                    ranges_df_30 = ranges_df['range-'+ranges_15[j]][i-30:i]
+                    volume_df_30 = ranges_df['trdQty-'+ranges_15[j]][i-30:i]
+                    if ranges_df['range-'+ranges_15[j]][i] <= ranges_df_30.min(): 
+                        if ranges_df['trdQty-'+ranges_15[j]][i] >= volume_df_30.mean():
+                            price_range = abs(ranges_df['clsPrc-'+ranges_15[j]][i] - ranges_df['opnPrc-'+ranges_15[j]][i])
+                            if price_range >= (ranges_df['range-'+ranges_15[j-1]][i] * 0.7):
+                                long_orders.append([ranges_df.index[i],ranges_15[j],ranges_df['clsPrc-'+ranges_15[j]][i]])
+                            elif price_range <= (ranges_df['range-'+ranges_15[j-1]][i] * 0.3):
+                                short_orders.append([ranges_df.index[i],ranges_15[j],ranges_df['clsPrc-'+ranges_15[j]][i]])
+        #sort dictionaries
+        def takeFirst(elem):
+            return elem[0]
 
-        #comparing range values
-        for j in range(0, len(ranges_15)):
-            if j+1 < len(ranges_15): 
-                for i in range(0, len(day1)):      
-                    price_range = abs(ranges_df['clsPrc-'+ranges_15[j+1]][i] - ranges_df['opnPrc-'+ranges_15[j+1]][i])
-                    if price_range >= (ranges_df['range-'+ranges_15[j]][i] * 0.7):
-                        print("long", i, price_range, (ranges_df['range-'+ranges_15[j]][i] * 0.7))
-                    elif price_range <= (ranges_df['range-'+ranges_15[j]][i] * 0.3):
-                        print("short", i, price_range, (ranges_df['range-'+ranges_15[j]][i] * 0.7))                        
+        long_orders.sort(key=takeFirst)
+        short_orders.sort(key=takeFirst)
+
+        print(long_orders)
+        print("----")
+        print(short_orders)
 
         return flag
 

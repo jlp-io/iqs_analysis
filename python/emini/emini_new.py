@@ -49,7 +49,7 @@ scenarios = {
         [
             RiseFall('1', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008), '16:00', hmPre='16:00', hmCur='09:30, 09:45'),
             NewRule2('2', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008)),
-            NewRule3('3', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008)),                        
+            #NewRule3('3', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008)),                        
             NewRule4('4', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008)),
             NewRule5('5', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008)),
             #NewRule6('6', 'CME SP500 eMini', 'clsPrc', StopSimple('inPrc', 0.008)),            
