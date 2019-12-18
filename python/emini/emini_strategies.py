@@ -296,6 +296,7 @@ class NewRule2(RiseFall):
 
     def signals(self, bars):
         # signals from prices
+        #flag values originate from this
         flag = super().signals(bars)
 
         # grab open, high, low
@@ -314,6 +315,7 @@ class NewRule2(RiseFall):
         test['opnLo-30'] = test['opnLo'].rolling(21).min() 
 
         # boolean for when test is false
+        # these lines change the flag values 
         zero = (test['opnHi'] > test['opnHi-30']) & (test['opnLo'] > test['opnLo-30'])
         flag[zero] = 0
         return flag
@@ -342,10 +344,15 @@ class NewRule3(RiseFall):
         flag = super().signals(bars)
         # grab prev day at 09:00 to 12:00, in 15 min increments
         day1 = daily_snapshots(bars, 'opnPrc,higPrc,lowPrc,clsPrc,trdQty'.split(','), ranges_15, 'America/New_York')
+        
+        flag = flag.loc[day1.index]
 
         ranges_df = day1.copy()
-        long_orders = list()
-        short_orders = list()
+        orders = list()
+        orderbook = dict()
+
+        for i in range(0, len(ranges_df)):
+            orderbook.update({ranges_df.index[i]: 0})
 
         #create range values for everything
         #need to reverse loop structure 
@@ -361,20 +368,19 @@ class NewRule3(RiseFall):
                         if ranges_df['trdQty-'+ranges_15[j]][i] >= volume_df_30.mean():
                             price_range = abs(ranges_df['clsPrc-'+ranges_15[j]][i] - ranges_df['opnPrc-'+ranges_15[j]][i])
                             if price_range >= (ranges_df['range-'+ranges_15[j-1]][i] * 0.7):
-                                long_orders.append([ranges_df.index[i],ranges_15[j],ranges_df['clsPrc-'+ranges_15[j]][i]])
+                                orders.append([ranges_df.index[i],ranges_15[j],ranges_df['clsPrc-'+ranges_15[j]][i],1])
+                                orderbook.update({ranges_df.index[i]: 1})
                             elif price_range <= (ranges_df['range-'+ranges_15[j-1]][i] * 0.3):
-                                short_orders.append([ranges_df.index[i],ranges_15[j],ranges_df['clsPrc-'+ranges_15[j]][i]])
+                                orders.append([ranges_df.index[i],ranges_15[j],ranges_df['clsPrc-'+ranges_15[j]][i],-1])
+                                orderbook.update({ranges_df.index[i]: -1})
         #sort dictionaries
         def takeFirst(elem):
             return elem[0]
 
-        long_orders.sort(key=takeFirst)
-        short_orders.sort(key=takeFirst)
-
-        print(long_orders)
-        print("----")
-        print(short_orders)
-
+        orders.sort(key=takeFirst)
+        sorted(orderbook.keys())
+        print(len(orders))
+        flag = pd.Series(orderbook)
         return flag
 
 # 4. If the price falls from 9.30am to 4pm by more than it has in any of the previous 90 days, go long the following
@@ -387,7 +393,6 @@ class NewRule4(RiseFall):
     def signals(self, bars):
         # signals from prices
         flag = super().signals(bars)
-
         # grab prev day at 09:30 and 16:00
         day1 = daily_snapshots(bars, self.prcType, self.hmPre, 'America/New_York')
         day1 = day1.shift(1)
@@ -441,7 +446,6 @@ class NewRule5(RiseFall):
         zero = zero.loc[zero.index.intersection(flag.index)]
         flag = flag.loc[zero.index]
         flag[zero] = 0
-        flag.to_clipboard()
         return flag
 
 # 6. Take the opening and closing prices of each 15 (or 30, 45, 60) consecutive one-minute periods from 9am to 12pm
