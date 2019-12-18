@@ -328,10 +328,9 @@ class NewRule2(RiseFall):
 #    ranges[i] < 30_day_low_of_ranges
 #        ranges[i][vol] >= ranges[i].mean()
 #            short
-
 class NewRule3(RiseFall):
     def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, 
-                hmPre='09:30,16:00', hmCur: str='09:45,10:00'):
+                hmPre='9:00,9:15,9:30,9:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30', hmCur: str='11:45,12:00'):
         super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
 
     def signals(self, bars):
