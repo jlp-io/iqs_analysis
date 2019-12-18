@@ -333,7 +333,6 @@ class NewRule3(RiseFall):
         super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
 
     def signals(self, bars):
-        #30_day_low_of_ranges = None
         #length of hmPre array causes a KeyError
         ranges_15 = ['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00']
         ranges_30 = ['9:00','9:30','10:00','10:30','11:00','11:30','12:00']
@@ -353,8 +352,11 @@ class NewRule3(RiseFall):
             for i in range(0, len(day1)):
                 ranges_df['range-'+ranges_15[j]][i] = (ranges_df['higPrc-'+ranges_15[j]][i] - day1['lowPrc-'+ranges_15[j]][i])
                 ranges.update({str(day1.index[i]) + ' ' + ranges_15[j]: (day1['higPrc-'+ranges_15[j]][i] - day1['lowPrc-'+ranges_15[j]][i])})
-
-        ranges_df.to_clipboard()
+                #30 day low calculation
+                if i >= 30:
+                    ranges_df_loc = ranges_df['range-'+ranges_15[j]][i-30:i]
+                    if ranges_df['range-'+ranges_15[j]][i] <= ranges_df_loc.min(): 
+                        print("new thirty day low", ranges_df.index[i], ranges_df['range-'+ranges_15[j]][i], ranges_df_loc.min()) 
 
         #comparing range values
         for j in range(0, len(ranges_15)):
@@ -362,7 +364,9 @@ class NewRule3(RiseFall):
                 for i in range(0, len(day1)):      
                     price_range = abs(ranges_df['clsPrc-'+ranges_15[j+1]][i] - ranges_df['opnPrc-'+ranges_15[j+1]][i])
                     if price_range >= (ranges_df['range-'+ranges_15[j]][i] * 0.7):
-                        print(i, price_range, (ranges_df['range-'+ranges_15[j]][i] * 0.7))
+                        print("long", i, price_range, (ranges_df['range-'+ranges_15[j]][i] * 0.7))
+                    elif price_range <= (ranges_df['range-'+ranges_15[j]][i] * 0.3):
+                        print("short", i, price_range, (ranges_df['range-'+ranges_15[j]][i] * 0.7))                        
 
         return flag
 
@@ -396,8 +400,6 @@ class NewRule4(RiseFall):
         zero = (day1['diff'] > day1['diff-90'])
         flag[zero] = 0
 
-        print(flag)
-        flag.to_clipboard()
         return flag
 
 # 5. If the price hits a 30-day high between 9.30am and 4pm, go long the following day at 9.45am if (i) the price 
@@ -432,22 +434,35 @@ class NewRule5(RiseFall):
         zero = zero.loc[zero.index.intersection(flag.index)]
         flag = flag.loc[zero.index]
         flag[zero] = 0
+        flag.to_clipboard()
         return flag
 
+# 6. Take the opening and closing prices of each 15 (or 30, 45, 60) consecutive one-minute periods from 9am to 12pm
+#    and calculate the number of times the price changes direction.  If the number is a 7 (or 14, 21, 30) -day high,
+#    go short; if the number is a 7 (or 14, 21, 30) –day low, go long.
 class NewRule6(RiseFall):
     def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, 
-                 hmPre='16:00', hmCur: str='09:30,09:45'):
+                 hmPre='9:30,16:00', hmCur: str='09:30,09:45'):
         super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
 
-    #def signals(self, bars):
+    def signals(self, bars):
+        ranges_15 = ['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00']        
+        flag = super().signals(bars)
+        day1 = daily_snapshots(bars, self.prcType, ranges_15, 'America/New_York')
 
+
+        return flag
+
+# 7. Measure the standard deviation for all 15, 30, 45 and 60-minute periods from 9am to 12pm.  If the value is a
+#    30-day high for the relevant timeframe, go short; if the value is a 30-day low for the relevant timeframe, go long.
 class NewRule7(RiseFall):
     def __init__(self, name, instr, prcType: str, stopper, hmUnw: str='16:00', *, 
-                 hmPre='16:00', hmCur: str='09:30,09:45'):
+                 hmPre='9:30,16:00', hmCur: str='09:30,09:45'):
         super().__init__(name, instr, prcType, stopper, hmUnw, hmPre=hmPre, hmCur=hmCur)
 
-    #def signals(self, bars):
-
+    def signals(self, bars):
+        flag = super().signals(bars)
+        return flag
 
 # 8. If the e-mini rises (or falls) between 4pm and 9.30am by more than it has on any of the previous 30 days, 
 #    and the S&P 500 also rises (or falls), go long (or short) at 9.30am.
