@@ -363,7 +363,7 @@ class NewRule3(RiseFall):
                 if i >= 30 & j-1 >= 0:
                     ranges_df_30 = ranges_df['range-'+ranges_15[j]][i-30:i]
                     volume_df_30 = ranges_df['trdQty-'+ranges_15[j]][i-30:i]
-                    if ranges_df['range-'+ranges_15[j]][i] <= ranges_df_30.min(): 
+                    if ranges_df['range-'+ranges_15[j]][i] <= ranges_df_30.min():
                         if ranges_df['trdQty-'+ranges_15[j]][i] >= volume_df_30.mean():
                             price_range = abs(ranges_df['clsPrc-'+ranges_15[j]][i] - ranges_df['opnPrc-'+ranges_15[j]][i])
                             if price_range >= (ranges_df['range-'+ranges_15[j-1]][i] * 0.7):
@@ -461,6 +461,7 @@ class NewRule6(RiseFall):
         day1 = daily_snapshots(bars, self.prcType, ranges_15, 'America/New_York')
 
 
+
         return flag
 
 # 7. Measure the standard deviation for all 15, 30, 45 and 60-minute periods from 9am to 12pm.  If the value is a
@@ -472,6 +473,55 @@ class NewRule7(RiseFall):
 
     def signals(self, bars):
         flag = super().signals(bars)
+        ranges_15 = ['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00']
+
+        day1 = daily_snapshots(bars, self.prcType, ranges_15, 'America/New_York')
+        flag = flag.loc[day1.index]
+
+        orderbook = dict()
+        for i in range(0, len(day1)):
+            orderbook.update({day1.index[i]: 0})
+
+        range_types = [['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00'],['9:00','9:30','10:00','10:30','11:00','11:30','12:00'],['9:00','9:45','10:30','11:15','12:00'],['9:00','10:00','11:00','12:00']]
+
+        #calculate all standard deviations
+        for k in range(0, len(range_types)):
+            for j in range(0, len(range_types[k])):
+                if (j+1 < len(range_types[k])):
+                    #naming of column
+                    day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]] = 0.0
+                    day1['std-30-day-high-'+range_types[k][j]+'-'+range_types[k][j+1]] = 0.0
+                    day1['std-30-day-low-'+range_types[k][j]+'-'+range_types[k][j+1]] = 0.0
+                    
+                    #loop through daily prices
+                    for i in range(0, len(day1)):
+                        #calculating std of the price range
+                        if k == 0:
+                            std_range = [day1['clsPrc-'+ranges_15[j]][i], day1['clsPrc-'+ranges_15[j+1]][i]]
+                        elif k == 1:
+                            std_range = [day1['clsPrc-'+ranges_15[j]][i], day1['clsPrc-'+ranges_15[j+1]][i], day1['clsPrc-'+ranges_15[j+2]][i]]
+                        elif k == 2:
+                            std_range = [day1['clsPrc-'+ranges_15[j]][i], day1['clsPrc-'+ranges_15[j+1]][i], day1['clsPrc-'+ranges_15[j+2]][i], day1['clsPrc-'+ranges_15[j+3]][i]]
+                        elif k == 3:
+                            std_range = [day1['clsPrc-'+ranges_15[j]][i], day1['clsPrc-'+ranges_15[j+1]][i], day1['clsPrc-'+ranges_15[j+2]][i], day1['clsPrc-'+ranges_15[j+3]][i], day1['clsPrc-'+ranges_15[j+4]][i]]
+
+                        day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]][i] = np.std(std_range)
+                        #day1['std-30-day-high'] = day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]].rolling(21).max()
+
+                        #30 day calculation
+                        #unnatural large # of positions appear to be entered in the orderbook
+                        if (i >= 30):
+                            std_30 = day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]][i-30:i]
+                            std_30 = pd.to_numeric(std_30)
+                            orderbook.update({np.argmin(std_30): -1})
+                            orderbook.update({np.argmax(std_30): 1})
+                            day1['std-30-day-high-'+range_types[k][j]+'-'+range_types[k][j+1]][np.argmax(std_30)] = std_30.max()
+                            day1['std-30-day-low-'+range_types[k][j]+'-'+range_types[k][j+1]][np.argmin(std_30)] = std_30.min()
+
+        sorted(orderbook.keys())
+        flag = pd.Series(orderbook)
+        day1.to_clipboard()
+
         return flag
 
 # 8. If the e-mini rises (or falls) between 4pm and 9.30am by more than it has on any of the previous 30 days, 
