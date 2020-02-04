@@ -460,8 +460,6 @@ class NewRule6(RiseFall):
         flag = super().signals(bars)
         day1 = daily_snapshots(bars, self.prcType, ranges_15, 'America/New_York')
 
-
-
         return flag
 
 # 7. Measure the standard deviation for all 15, 30, 45 and 60-minute periods from 9am to 12pm.  If the value is a
@@ -474,6 +472,7 @@ class NewRule7(RiseFall):
     def signals(self, bars):
         flag = super().signals(bars)
         ranges_15 = ['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00']
+        range_types = [['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00'],['9:00','9:30','10:00','10:30','11:00','11:30','12:00'],['9:00','9:45','10:30','11:15','12:00'],['9:00','10:00','11:00','12:00']]
 
         day1 = daily_snapshots(bars, self.prcType, ranges_15, 'America/New_York')
         flag = flag.loc[day1.index]
@@ -482,12 +481,20 @@ class NewRule7(RiseFall):
         for i in range(0, len(day1)):
             orderbook.update({day1.index[i]: 0})
 
-        range_types = [['9:00','9:15','9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15','11:30','11:45','12:00'],['9:00','9:30','10:00','10:30','11:00','11:30','12:00'],['9:00','9:45','10:30','11:15','12:00'],['9:00','10:00','11:00','12:00']]
+        #use these loops to calculate all std analysis
+        #for k in range(0, len(range_types)):
+            #for j in range(0, len(range_types[k])):
 
-        #calculate all standard deviations
-        for k in range(0, len(range_types)):
-            for j in range(0, len(range_types[k])):
-                if (j+1 < len(range_types[k])):
+        #use this loop to isolate time periods for the flag object
+        #@int k,j: time slots
+        #k refers to 15, 30, 45, 60 min intervals, 0-3 range
+        #j refers to iterating each time period within the interval array i.e. 9:00-9:15, 9:15-9:30, 0-len(k) range (12, 6, 4, 3)
+        #setting k,j variables isolates the backtest to looking at prices for specific time periods
+        for i in range(0, 1):
+            k = 0
+            j = 0
+
+            if (j+1 < len(range_types[k])):
                     #naming of column
                     day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]] = 0.0
                     day1['std-30-day-high-'+range_types[k][j]+'-'+range_types[k][j+1]] = 0.0
@@ -506,7 +513,6 @@ class NewRule7(RiseFall):
                             std_range = [day1['clsPrc-'+ranges_15[j]][i], day1['clsPrc-'+ranges_15[j+1]][i], day1['clsPrc-'+ranges_15[j+2]][i], day1['clsPrc-'+ranges_15[j+3]][i], day1['clsPrc-'+ranges_15[j+4]][i]]
 
                         day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]][i] = np.std(std_range)
-                        #day1['std-30-day-high'] = day1['std-'+range_types[k][j]+'-'+range_types[k][j+1]].rolling(21).max()
 
                         #30 day calculation
                         #unnatural large # of positions appear to be entered in the orderbook
@@ -518,8 +524,11 @@ class NewRule7(RiseFall):
                             day1['std-30-day-high-'+range_types[k][j]+'-'+range_types[k][j+1]][np.argmax(std_30)] = std_30.max()
                             day1['std-30-day-low-'+range_types[k][j]+'-'+range_types[k][j+1]][np.argmin(std_30)] = std_30.min()
 
+
         sorted(orderbook.keys())
         flag = pd.Series(orderbook)
+        print(orderbook)
+        day1.to_csv('day1.csv')
         day1.to_clipboard()
 
         return flag
